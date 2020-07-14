@@ -1,4 +1,4 @@
-// 200713 월요일 실습 : module.exports = & 
+// 200713 월요일 실습 : module.exports = & require()
 const connection = require('./mysql_connection.js')
 
 // students/papers table 실습문제 1
