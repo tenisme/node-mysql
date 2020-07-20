@@ -1,20 +1,20 @@
 {
-  "name": "server-ex",
+  "name": "contact",
   "version": "1.0.0",
   "description": "",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
     "start": "node server",
     "dev": "nodemon server"
   },
-  "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "dotenv": "^8.2.0",
     "express": "^4.17.1",
     "morgan": "^1.10.0",
-    "mysql2": "^2.1.0"
+    "mysql2": "^2.1.0",
+    "postman-request": "^2.88.1-postman.23"
   },
   "devDependencies": {
     "nodemon": "^2.0.4"
