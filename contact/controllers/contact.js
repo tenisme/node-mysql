@@ -2,53 +2,107 @@ const connection = require("../db/mysql_connection.js");
 const ErrorResponse = require("../utils/errorResponse.js");
 
 // @desc    모든 주소록 가져오기
-// @route   GET /api/v1/contacts
+// @route   GET /api/v1/contacts?offset=0&limit=5
 exports.getContacts = async (req, res, next) => {
+  let offset = req.query.offset;
+  let limit = req.query.limit;
+
+  let query = `select * from contact limit ${offset}, ${limit}`;
+
   try {
-    [rows, fields] = await connection.query("select * from contact");
-    console.log(rows);
-    res.status(200).json({ success: true, items: rows });
+    [rows, fields] = await connection.query(query);
+    let count = rows.length;
+    console.log("length_count : " + count);
+    res.status(200).json({ success: true, items: rows, count: count });
   } catch (e) {
-    next(new ErrorResponse("주소록을 전부 가져오는데 에러 발생", 400));
+    res.status(500).json({ success: false, message: "DB ERROR", error: e });
   }
 };
 
-// @desc    새로운 주소를 insert
+// @desc    주소록 1개 추가하기
 // @route   POST /api/v1/contacts
-// @body    {"name" : "", "phone_number" : ""}
+// @parameters  name, phone
 exports.createContact = async (req, res, next) => {
   let name = req.body.name;
-  let phone_number = req.body.phone_number;
+  let phone = req.body.phone;
 
-  let query = "insert into contact (name, phone_number) values ?";
-  let values = [];
-  values.push([name, phone_number]);
+  let query = "insert into contact (name, phone) values ?";
+  let values = [name, phone];
 
   try {
-    [rows, fields] = await connection.query(query, [values]);
-    console.log(rows);
-    res.status(200).json({ success: true, user_id: rows.insertId });
+    [result] = await connection.query(query, [[values]]);
+    console.log(
+      "affectedRows : " +
+        result.affectedRows +
+        ", insertId : " +
+        result.insertId
+    );
+    res.status(200).json({ success: true, result: result });
   } catch (e) {
-    next(new ErrorResponse("주소록을 추가하는데 DB 에러 발생", 500));
+    res.status(500).json({ success: false, message: "DB ERROR", error: e });
   }
 };
 
-// @desc 주소록을 삭제
-// @route DELETE /api/v1/contacts/:id
-exports.deleteContact = async (req, res, next) => {
-  let id = req.params.id;
+// @desc    주소록 1개 수정하기
+// @route   PUT /api/v1/contacts
+// @parameters  id, name, phone
+exports.updateContact = async (req, res, next) => {
+  let id = req.body.id;
+  let name = req.body.name;
+  let phone = req.body.phone;
 
-  let query = `delete from contact where id = ${id}`;
+  let query = "update contact set name = ?, phone = ? where id = ?";
+  let values = [name, phone, id];
+
+  try {
+    [result] = await connection.query(query, values);
+    console.log(
+      "affectedRows : " +
+        result.affectedRows +
+        ", changedRows : " +
+        result.changedRows
+    );
+    res.status(200).json({ success: true, result: result });
+  } catch (e) {
+    res.status(500).json({ success: false, message: "DB ERROR", error: e });
+  }
+};
+
+// @desc    주소록 1개 삭제하기
+// @route   DELETE /api/v1/contacts
+// @parameters  id
+exports.deleteContact = async (req, res, next) => {
+  let id = req.body.id;
+
+  let query = "delete from contact where id = ?";
+  let values = [id];
+
+  try {
+    [result] = await connection.query(query, values);
+    console.log(
+      "affectedRows : " +
+        result.affectedRows +
+        ", warningStatus : " +
+        result.warningStatus
+    );
+    res.status(200).json({ success: true, result: result });
+  } catch (e) {
+    res.status(500).json({ success: false, message: "DB ERROR", error: e });
+  }
+};
+
+// @desc    이름이나 폰번호로 검색하기
+// @route   GET /api/v1/contacts/search?keyword=
+exports.searchContact = async (req, res, next) => {
+  let keyword = req.query.keyword;
+
+  let query = `select * from contact where name like "%${keyword}%" or phone like "%${keyword}%"`;
 
   try {
     [rows, fields] = await connection.query(query);
     console.log(rows);
-    if (rows.affectedRows == 1) {
-      res.status(200).json({ success: true });
-    } else {
-      return next(new ErrorResponse("아이디값 잘못 보냄", 400));
-    }
+    res.status(200).json({ success: true, items: rows });
   } catch (e) {
-    next(new ErrorResponse("주소록을 가져오는데 DB 에러 발생", 500));
+    res.status(500).json({ success: false, message: "DB ERROR", error: e });
   }
 };

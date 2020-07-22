@@ -15,6 +15,7 @@ const errorHandler = require("./middleware/error.js");
 
 // 3. 직접 만든 라우터 파일을 가져온다.
 const bootcamps = require("./routes/bootcamps.js");
+const users = require("./routes/users.js");
 
 // 4. 라우터 연결 : .env(환경 설정 파일)의 내용을 dotenv.config({path:경로.env})로 불러온다.
 dotenv.config({ path: "./config/config.env" });
@@ -30,15 +31,24 @@ app.use(express.json());
 //   express().use(logger)의 위치는 아래의 라우터 연결 전이어야 한다.
 app.use(logger);
 
+// app.use((req, res, next) => {
+//   // 사이트 접속 막기
+//   // res.status(503).send("사이트 점검중입니다.");
+//   // 특정 메소드 막기
+//   // if (req.method === "GET") {
+//   //   // === : isEqual()
+//   //   res.json({ alert: "GET requests are disabled" });
+//   // } else {
+//   //   next(); // 처리하고 밑으로 넘겨라. 이거 없으면 안 넘김.
+//   // }
+// });
+
 // app.use(morgan("combined"));
 
 // 6. 라우터 연결 : "사용할 url의 path"와 "라우터 파일"을 app.use("url의 path", 라우터변수)으로 연결한다.
 //   이걸 여러개 쓸 수 있다.
 app.use("/api/v1/bootcamps", bootcamps);
-// 여러개 쓰기 예시
-// app.use("/api/v1/shirts", shirts);
-// app.use("/api/v1/books", books);
-// app.use("/api/v2/bootcamps", bootcamps);
+app.use("/api/v1/users", users);
 
 // 위의 에러를 처리하기 위해서, 에러 핸들러 미들웨어 연결
 app.use(errorHandler);
