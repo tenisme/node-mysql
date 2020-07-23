@@ -5,14 +5,18 @@
 // 선행 0-1. config 폴더/ ~.env 환경설정 파일 만들기.
 // 선행 0-2. routes 폴더/ ~.js 라우터 파일 만들기.
 
+// npm 패키지 설치한 것들에 대한 require
 // 1. express 가져오기 - express : 웹 서버를 동작시키는 프레임워크
 const express = require("express");
 // 2. dotenv 가져오기 - dotenv : config.env 파일을 가져와서 사용할 수 있는 모듈
 const dotenv = require("dotenv");
 const morgan = require("morgan"); // 미들웨어 사용
+
+// 미들웨어에 대한 require
 const logger = require("./middleware/logger.js");
 const errorHandler = require("./middleware/error.js");
 
+// 라우터에 대한 require
 // 3. 직접 만든 라우터 파일을 가져온다.
 const bootcamps = require("./routes/bootcamps.js");
 const users = require("./routes/users.js");

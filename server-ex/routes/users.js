@@ -1,5 +1,7 @@
 // 각 "경로"별로 router를 셋팅하는 파일
 const express = require("express");
+const auth = require("../middleware/auth.js");
+
 const {
   createUser,
   login,
@@ -18,10 +20,11 @@ const router = express.Router();
 //   post : 클라이언트가 서버에 새로운 정보를 보내고 이걸 저장해야 할 때. db의 insert
 //   put : db의 update
 //   delete : 삭제 관련 메소드
-router.route("/").post(createUser); // "/"로 들어올 때 처리하는 프로토콜들은 각각 이런 함수로 처리하겠다.
+
+// 인증이 필요한 api에 'auth, '를 추가한다.
+router.route("/").post(createUser).get(auth, getMyInfo); // "/"로 들어올 때 처리하는 프로토콜들은 각각 이런 함수로 처리하겠다.
 router.route("/login").post(login);
 router.route("/change_passwd").put(changePasswd);
-router.route("/:id").get(getMyInfo);
 
 // exports 처리
 module.exports = router;

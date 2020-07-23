@@ -1,43 +1,36 @@
 const connection = require("../db/mysql_connection.js");
-const ErrorResponse = require("../utils/errorResponse.js");
-const validator = require("validator");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const chalk = require("chalk");
 
 // @desc    회원가입
-// @route   POST /api/v1/users
-// @parameters  email, passwd
+// @route   POST /api/v1/memos/user
+// parameters   login_id, password
 exports.createUser = async (req, res, next) => {
-  let email = req.body.email;
-  let passwd = req.body.passwd;
+  console.log("회원가입 API 실행");
 
-  // 패스워드 암호화 (bcrypt)
-  // 비밀번호는 단방향 암호화를 해야 한다. 그래야 복호화가 안 되서 안전하다.
-  const hashedPasswd = await bcrypt.hash(passwd, 8); // 8번 암호화가 제일 빠르고 안전하다.
+  let login_id = req.body.login_id;
+  let password = req.body.password;
 
-  // 이메일이 정상적인가 체크
-  if (!validator.isEmail(email)) {
-    res.status(500).json({ success: false });
-    return; // 리턴 까먹지 말기
-  }
+  // 패스워드 암호화
+  const hashedPasswd = await bcrypt.hash(password, 8);
 
-  // 유저 인서트
-  let query = "insert into user (email, passwd) values ?";
-  let values = [email, hashedPasswd];
-  let user_id;
+  // memo_user DB에 유저 추가
+  let query = "insert into memo_user (login_id, password) values ?";
+  let values = [login_id, hashedPasswd];
+  let insert_id;
 
   try {
     [result] = await connection.query(query, [[values]]);
     console.log(chalk.blueBright(JSON.stringify(result)));
-    user_id = result.insertId;
+    insert_id = result.insertId;
   } catch (e) {
     if (e.errno == 1062) {
       // 1062 : 이메일 중복 에러
       res.status(400).json({
         success: false,
         errno: 1,
-        message: `${email}은 이미 가입된 이메일입니다`,
+        message: `이미 존재하는 아이디입니다.`,
       });
       return;
     } else {
@@ -46,10 +39,10 @@ exports.createUser = async (req, res, next) => {
     }
   }
 
-  // 토큰 만들기 / DB저장하기
-  let token = jwt.sign({ user_id: user_id }, process.env.ACCESS_TOKEN_SECRET);
+  // 토큰 만들기 / memo_token DB에 저장하기
+  let token = jwt.sign({ user_id: insert_id }, process.env.ACCESS_TOKEN_SECRET);
 
-  query = `insert into token (token, user_id) values ('${token}',${user_id})`;
+  query = `insert into memo_token (token, user_id) values ('${token}',${insert_id})`;
 
   try {
     [result] = await connection.query(query);
@@ -62,28 +55,30 @@ exports.createUser = async (req, res, next) => {
 };
 
 // @desc    로그인
-// @route   POST /api/v1/users/login
-// @parameters  email, passwd
-exports.login = async (req, res, next) => {
-  let email = req.body.email;
-  let passwd = req.body.passwd;
+// @route   POST /api/v1/memos/user/login
+// @parameters  login_id, password
+exports.loginUser = async (req, res, next) => {
+  console.log("로그인 API 실행");
 
-  // 입력한 이메일로 유저 찾기 쿼리
-  let query = `select * from user where email = '${email}'`;
+  let login_id = req.body.login_id;
+  let password = req.body.password;
+
+  // 입력한 아이디로 유저 찾기 쿼리
+  let query = `select * from memo_user where login_id = '${login_id}'`;
 
   try {
-    [rows, fields] = await connection.query(query);
+    [row] = await connection.query(query);
 
-    // 등록된 이메일인지 체크
-    if (rows.length == 0) {
+    // 등록된 아이디인지 체크
+    if (row.length == 0) {
       res
         .status(400)
-        .json({ success: false, message: "등록되지 않은 이메일입니다" });
+        .json({ success: false, message: "등록되지 않은 아이디입니다" });
       return;
     }
 
     // 기존 비밀번호와 맞는지 체크 (bcrypt)
-    let isMatch = await bcrypt.compare(passwd, rows[0].passwd);
+    let isMatch = await bcrypt.compare(password, row[0].password);
 
     if (!isMatch) {
       res.status(400).json({
@@ -96,12 +91,12 @@ exports.login = async (req, res, next) => {
 
     // 토큰 생성 (jwt)
     let token = jwt.sign(
-      { user_id: rows[0].id },
+      { user_id: row[0].user_id },
       process.env.ACCESS_TOKEN_SECRET
     );
 
     // DB에 토큰 저장 쿼리
-    query = `insert into token (token, user_id) values ('${token}',${rows[0].id})`;
+    query = `insert into memo_token (token, user_id) values ('${token}',${row[0].user_id})`;
 
     try {
       [result] = await connection.query(query);
@@ -119,26 +114,38 @@ exports.login = async (req, res, next) => {
   }
 };
 
-// @desc    패스워드 변경
-// @route   PUT /api/v1/users/change_passwd
-// @parameters  email, passwd
-exports.changePasswd = async (req, res, next) => {
-  let email = req.body.email;
-  let passwd = req.body.passwd;
+// @desc    사용자 개인 정보 조회
+// @route   GET /api/v1/memos/user/my_info
+// @public  auth
+exports.getUserInfo = async (req, res, next) => {
+  console.log("회원 정보 조회 API 실행");
 
-  let query = `select passwd from user where email = '${email}'`;
+  res.status(200).json({ success: true, result: req.user });
+};
+
+// @desc    패스워드 변경
+// @route   PUT /api/v1/memos/user/change_password
+// @parameters  login_id, password
+// @public  auth
+exports.changePasswd = async (req, res, next) => {
+  console.log("패스워드 변경 API 실행");
+
+  let login_id = req.body.login_id;
+  let password = req.body.password;
+
+  let query = `select password from memo_user where login_id = '${login_id}'`;
 
   try {
-    [rows, fields] = await connection.query(query);
+    [row] = await connection.query(query);
 
-    if (rows.length == 0) {
+    if (row.length == 0) {
       res
         .status(400)
         .json({ success: false, message: "등록되지 않은 이메일입니다" });
       return;
     }
 
-    let isMatch = await bcrypt.compare(passwd, rows[0].passwd);
+    let isMatch = await bcrypt.compare(password, row[0].password);
 
     if (!isMatch) {
       res.status(400).json({
@@ -150,7 +157,7 @@ exports.changePasswd = async (req, res, next) => {
 
     let new_passwd = req.body.new_passwd;
 
-    if (passwd == new_passwd) {
+    if (password == new_passwd) {
       res.status(400).json({
         success: false,
         message: "기존 암호와 다른 암호를 입력하세요",
@@ -160,7 +167,7 @@ exports.changePasswd = async (req, res, next) => {
 
     const hashedPasswd = await bcrypt.hash(new_passwd, 8);
 
-    query = `update user set passwd = '${hashedPasswd}' where email = '${email}'`;
+    query = `update memo_user set password = '${hashedPasswd}' where login_id = '${login_id}'`;
 
     try {
       [result] = await connection.query(query);
@@ -183,12 +190,4 @@ exports.changePasswd = async (req, res, next) => {
   } catch (e) {
     res.status(500).json({ success: false, error: e });
   }
-};
-
-// @desc    회원 정보(내 정보) 가져오기
-// @route   GET /api/v1/users
-exports.getMyInfo = async (req, res, next) => {
-  console.log("내 정보 가져오는 API : " + req.user);
-
-  res.status(200).json({ success: true, result: req.user });
 };

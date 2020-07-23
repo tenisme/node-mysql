@@ -1,5 +1,7 @@
 // 각 "경로"별로 router를 셋팅하는 파일
 const express = require("express");
+const auth = require("../middleware/auth.js");
+
 const {
   getBootcamps,
   getBootcamp,
