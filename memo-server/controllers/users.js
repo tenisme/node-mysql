@@ -115,9 +115,10 @@ exports.loginUser = async (req, res, next) => {
 };
 
 // @desc    사용자 개인 정보 조회
-// @route   GET /api/v1/memos/user/my_info
-// @public  auth
-exports.getUserInfo = async (req, res, next) => {
+// @url   GET /api/v1/memos/user/my_info
+// @request
+// @response  id, email, created_at
+exports.getUserInfo = (req, res, next) => {
   console.log("회원 정보 조회 API 실행");
 
   res.status(200).json({ success: true, result: req.user });
