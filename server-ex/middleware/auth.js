@@ -8,6 +8,13 @@ const auth = async (req, res, next) => {
 
   // 헤더에서 토큰값 빼오는 방법
   let token = req.header("Authorization");
+
+  // 토큰이 없는 경우
+  if (!token) {
+    res.status(401).json({ error: "not token" });
+    return;
+  }
+
   token = token.replace("Bearer ", ""); // "Bearer "를 뺀다.
   console.log("token : " + token);
 
@@ -18,7 +25,7 @@ const auth = async (req, res, next) => {
     console.log(decoded);
     user_id = decoded.user_id;
   } catch (e) {
-    res.status(401).json({ error: "형식에 맞지 않는 토큰" });
+    res.status(401).json({ error: "형식에 맞지 않는 토큰(해커 ㅎㅇ)" });
     return;
   }
 
@@ -27,7 +34,7 @@ const auth = async (req, res, next) => {
 
   try {
     [rows, fields] = await connection.query(query);
-    console.log(chalk.blueBright(JSON.stringify(rows)));
+    // console.log(chalk.blueBright(JSON.stringify(rows)));
   } catch (e) {
     res.status(401).json({ error: "인증 먼저 하십시오" });
     return;
@@ -56,6 +63,7 @@ const auth = async (req, res, next) => {
       delete user.passwd;
       // req에 user 영역을 만들어 rows[0](select한 유저 정보)를 저장한다.
       req.user = user;
+      req.user.token = token;
       next();
     } catch (e) {
       res.status(500).json({ error: "DB 에러" });

@@ -4,6 +4,7 @@ const validator = require("validator");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const chalk = require("chalk");
+const sendEmail = require("../utils/sendemail.js");
 
 // @desc    회원가입
 // @route   POST /api/v1/users
@@ -53,6 +54,19 @@ exports.createUser = async (req, res, next) => {
 
   try {
     [result] = await connection.query(query);
+
+    const message = "환영합니다";
+    try {
+      await sendEmail({
+        email: "iamchoma@gmail.com",
+        subject: "회원가입축하",
+        message: message,
+      });
+    } catch (e) {
+      res.status(500).json({ success: false, error: e });
+      return;
+    }
+
     res
       .status(200)
       .json({ success: true, token: token, result: "가입을 환영합니다" });
@@ -188,7 +202,73 @@ exports.changePasswd = async (req, res, next) => {
 // @desc    회원 정보(내 정보) 가져오기
 // @route   GET /api/v1/users
 exports.getMyInfo = async (req, res, next) => {
-  console.log("내 정보 가져오는 API : " + req.user);
+  console.log("내 정보 가져오는 API 실행됨");
 
   res.status(200).json({ success: true, result: req.user });
+};
+
+// @desc    로그아웃 api : DB에서 해당 유저의 현재 토큰값을 삭제
+// @route   POST /api/v1/users/logout
+exports.logout = async (req, res, next) => {
+  // 토큰 테이블에서 현재 이 헤더에 있는 토큰을 삭제한다.
+  let token = req.user.token;
+  let user_id = req.user.id;
+
+  let query = `delete from token where user_id = ${user_id} and token = "${token}"`;
+
+  console.log(query);
+
+  try {
+    [result] = await connection.query(query);
+    if (result.affectedRows == 1) {
+      res.status(200).json({ success: true, result: result });
+    } else {
+      res.status(400).json({ success: false });
+      return;
+    }
+  } catch (e) {
+    res.status(500).json({ success: false, error: e });
+  }
+};
+
+// @desc    현재 로그인한 기기를 제외한 로그인된 모든 기기에서 로그아웃하기
+// @route   POST /api/v1/users/logout/all
+exports.logoutAll = async (req, res, next) => {
+  let token = req.user.token;
+  let user_id = req.user.id;
+
+  let query = `delete from token where user_id = ${user_id} and not token = "${token}"`;
+
+  try {
+    [result] = await connection.query(query);
+
+    res.status(200).json({ success: true, result: result });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e });
+  }
+};
+
+// @desc    회원탈퇴 : DB에서 해당 회원의 유저 정보 삭제, 유저 정보가 있는 다른 테이블도 정보 삭제.
+// @route   DELETE /api/v1/users
+exports.deleteUser = async (req, res, next) => {
+  let user_id = req.user.id;
+
+  let query = `delete from user where id = ${user_id}`;
+
+  const conn = await connection.getConnection();
+  try {
+    await conn.beginTransaction();
+    // 첫번째 테이블에서 정보 삭제
+    [result] = await conn.query(query);
+    // 두번째 테이블에서 정보 삭제
+    query = `delete from token where user_id=${user_id}`;
+    [result] = await conn.query(query);
+    await conn.commit();
+    res.status(200).json({ success: true });
+  } catch (e) {
+    await conn.rollback();
+    res.status(500).json({ success: false, error: e });
+  } finally {
+    await conn.release();
+  }
 };
