@@ -10,7 +10,8 @@ const {
   logout,
   logoutAll,
   deleteUser,
-  sendEmail,
+  forgotPasswd,
+  resetPasswd,
 } = require("../controllers/users.js"); // 함수단위로 여러개를 exports했으므로 json으로 함수들을 가져왔다.
 
 // next 파라미터는 미들 웨어랑 관련이 있다.
@@ -35,6 +36,8 @@ router.route("/login").post(login);
 router.route("/change_passwd").put(changePasswd);
 router.route("/logout").post(auth, logout);
 router.route("/logout/all").post(auth, logoutAll);
+router.route("/forgotpasswd").post(auth, forgotPasswd);
+router.route("/resetpasswd/:resetPasswdToken").post(auth, resetPasswd);
 
 // exports 처리
 module.exports = router;
