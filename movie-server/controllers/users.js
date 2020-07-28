@@ -13,7 +13,11 @@ const sendEmail = require("../utils/sendemail.js");
 // @route   POST /api/v1/users
 // @req     login_id, email, passwd
 exports.createUser = async (req, res, next) => {
-  console.log(chalk.bold("< 회원 가입 api 실행됨 >"));
+  console.log(
+    chalk.bold(
+      "--------------------< 회원 가입 api 실행됨 >--------------------"
+    )
+  );
   // body에서 id/email/passwd 가져오기
   let login_id = req.body.login_id;
   let email = req.body.email;
@@ -90,7 +94,9 @@ exports.createUser = async (req, res, next) => {
 // @route   POST /api/v1/users/login
 // @req     login_id, passwd
 exports.login = async (req, res, next) => {
-  console.log(chalk.bold("< 로그인 api 실행됨 >"));
+  console.log(
+    chalk.bold("--------------------< 로그인 api 실행됨 >--------------------")
+  );
   // body에서 id/passwd 가져오기
   let login_id = req.body.login_id;
   let passwd = req.body.passwd;
@@ -152,7 +158,11 @@ exports.login = async (req, res, next) => {
 // @desc    회원 탈퇴 api - with auth
 // @route   DELETE /api/v1/users
 exports.deleteUser = async (req, res, next) => {
-  console.log(chalk.bold("< 회원 탈퇴 api 실행됨 >"));
+  console.log(
+    chalk.bold(
+      "--------------------< 회원 탈퇴 api 실행됨 >--------------------"
+    )
+  );
   // user에 저장된 user_id 가져오기
   let user_id = req.user.user_id;
 
@@ -186,7 +196,11 @@ exports.deleteUser = async (req, res, next) => {
 // @route   PUT /api/v1/users/updatepasswd
 // @req     passwd, new_passwd
 exports.updatePasswd = async (req, res, next) => {
-  console.log(chalk.bold("< 패스워드 변경 api 실행됨 >"));
+  console.log(
+    chalk.bold(
+      "--------------------< 패스워드 변경 api 실행됨 >--------------------"
+    )
+  );
   let user_id = req.user.user_id;
   let passwd = req.body.passwd;
 
@@ -248,6 +262,11 @@ exports.updatePasswd = async (req, res, next) => {
 // @route   POST /api/v1/users/forgotpasswd
 // @req     login_id, email
 exports.forgotPasswd = async (req, res, next) => {
+  console.log(
+    chalk.bold(
+      "--------------------< 패스워드 분실/요청 api 실행됨 >--------------------"
+    )
+  );
   let login_id = req.body.login_id;
   let email = req.body.email;
 
@@ -306,6 +325,11 @@ exports.forgotPasswd = async (req, res, next) => {
 // @route   POST /api/v1/users/resetpasswd/:resetPasswdToken
 // @req     resetPasswdToken, new_passwd
 exports.resetPasswd = async (req, res, next) => {
+  console.log(
+    chalk.bold(
+      "--------------------< 패스워드 초기화 api 실행됨 >--------------------"
+    )
+  );
   const resetPasswdToken = req.params.resetPasswdToken;
 
   let query = `select * from movie_user where reset_passwd_token = "${resetPasswdToken}"`;
