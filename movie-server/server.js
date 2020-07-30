@@ -6,8 +6,10 @@ const morgan = require("morgan");
 // 라우터 require
 const movies = require("./routes/movies.js");
 const users = require("./routes/users.js");
+const favorites = require("./routes/favorites.js");
+const replies = require("./routes/replies.js");
 
-// 환경설정 파일 로딩
+// 기타 파일 셋팅
 dotenv.config({ path: "./config/config.env" });
 
 const app = express();
@@ -20,6 +22,8 @@ app.use(morgan("dev"));
 
 app.use("/api/v1/movies", movies);
 app.use("/api/v1/users", users);
+app.use("/api/v1/favorites", favorites);
+app.use("/api/v1/replies", replies);
 
 const PORT = process.env.PORT || 5100;
 

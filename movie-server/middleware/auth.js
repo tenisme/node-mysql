@@ -3,12 +3,11 @@ const jwt = require("jsonwebtoken"); // 얘가 있어야 토큰값 decode 가능
 const chalk = require("chalk");
 const connection = require("../db/mysql_connection.js");
 
+let nomal_txt = chalk.cyanBright;
+let highlight_txt = chalk.yellowBright;
+
 const auth = async (req, res, next) => {
-  console.log(
-    chalk.bold(
-      "--------------------<  인증 미들웨어 실행됨  >--------------------"
-    )
-  );
+  console.log(chalk.bold("<<  인증 미들웨어 실행됨  >>"));
 
   // 헤더에서 토큰값 빼오는 방법
   let token = req.header("Authorization");
@@ -20,13 +19,13 @@ const auth = async (req, res, next) => {
   }
 
   token = token.replace("Bearer ", ""); // "Bearer "를 뺀다.
-  console.log(chalk.cyanBright("token : " + token));
+  console.log(highlight_txt.bold("login token") + nomal_txt(" - " + token));
 
   // 빼온 토큰값 decode해서 user_id값 빼오기
   let user_id;
   try {
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-    console.log(decoded);
+    // console.log(decoded);
     user_id = decoded.user_id;
   } catch (e) {
     res.status(401).json({ error: "형식에 맞지 않는 토큰(해커 ㅎㅇ)" });
@@ -61,15 +60,24 @@ const auth = async (req, res, next) => {
       // 유저 정보를 req에 셋팅해서 next()한다.
       //   왜? 인증하면서, 유저 정보를 아예 가져와서 req에 저장하기 때문에
       //   API함수에서는 DB에서 유저 정보를 가져오는 코드를 작성할 필요가 없다.
+
       console.log(
-        chalk.yellowBright.bold("User authorization") +
-          chalk.cyanBright(
-            ` - login_id : ${rows[0].login_id}, email : ${rows[0].email}, created_at : ${rows[0].created_at}`
-          )
+        highlight_txt.bold("User authorization") +
+          nomal_txt(" - user_id : ") +
+          highlight_txt(user_id) +
+          nomal_txt(", login_id : ") +
+          highlight_txt(rows[0].login_id) +
+          nomal_txt(", email : ") +
+          highlight_txt(rows[0].email) +
+          nomal_txt(", created_at : ") +
+          highlight_txt(rows[0].created_at)
       );
+
       let user = rows[0];
+
       // 패스워드 정보는 필요 없으므로 빼고
       delete user.passwd;
+
       // req에 user 영역을 만들어 rows[0](select한 유저 정보)를 저장한다.
       req.user = user;
       req.user.token = token;

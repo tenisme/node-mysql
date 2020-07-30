@@ -1,20 +1,29 @@
 const connection = require("../db/mysql_connection.js");
 const chalk = require("chalk");
 
-// @desc    영화 데이터 불러오기
-// @url     GET /api/v1/movies
-// @request offset, limit (?offset=0&limit=25)
-// @response success, error, items : [{ id, title, genre, attendance, year }, cnt]
+// @desc    영화 데이터 조회 api
+// @route   GET /api/v1/movies
+// @req     offset, limit
+// @res     success, items : [{id, title, genre, attendance, year, cnt_comments, avg_rating}, cnt]
 exports.getMovies = async (req, res, next) => {
+  console.log(chalk.bold("<<  영화 데이터 조회 api 실행됨  >>"));
+
   let offset = req.query.offset;
   let limit = req.query.limit;
 
   if (!offset || !limit) {
-    res.status(400).json({ message: "파라미터 셋팅 에러" });
+    res.status(400).json({ success: false, message: "파라미터 셋팅 에러" });
     return;
   }
 
-  let query = `select * from movie limit ${offset}, ${limit}`;
+  let query = `select m.*, count(r.comments) as cnt_comments, 
+  ifnull(round(avg(r.rating), 2), "unrated") as avg_rating 
+  from movie as m 
+  left join movie_reply as r 
+  on m.id = r.movie_id 
+  group by m.id 
+  order by m.id 
+  limit ${offset}, ${limit}`;
 
   try {
     [rows] = await connection.query(query);
@@ -24,11 +33,13 @@ exports.getMovies = async (req, res, next) => {
   }
 };
 
-// @desc    영화명 검색해서 가져오기
-// @url     GET /api/v1/movies/search
-// @request keyword, offset, limit (?offset=0&limit=25&keyword=war)
-// @response success, error, items : [{ id, title, genre, attendance, year }, cnt]
+// @desc    영화명으로 조회 api
+// @route   GET /api/v1/movies/search
+// @req     keyword, offset, limit
+// @res     success, items : [{id, title, genre, attendance, year, cnt_comments, avg_rating}, cnt]
 exports.searchMovies = async (req, res, next) => {
+  console.log(chalk.bold("<<  영화명 검색 api 실행됨  >>"));
+
   let keyword = req.query.keyword;
   let offset = req.query.offset;
   let limit = req.query.limit;
@@ -38,64 +49,45 @@ exports.searchMovies = async (req, res, next) => {
     return;
   }
 
-  if (!keyword) {
-    keyword = "";
+  if (!keyword || keyword == "") {
+    res.status(400).json({ message: "검색어를 입력해주세요" });
+    return;
   }
 
-  let query = `select * from movie where title like '%${keyword}%' limit ${offset}, ${limit};`;
-  console.log(query);
+  let query = `select m.*, count(r.comments) as cnt_comments, 
+  ifnull(round(avg(r.rating), 2), "unrated") as avg_rating 
+  from movie as m 
+  left join movie_reply as r 
+  on m.id = r.movie_id 
+  where m.title like "%${keyword}%" 
+  group by m.id 
+  order by m.id 
+  limit ${offset}, ${limit}`;
 
   try {
     [rows] = await connection.query(query);
+
+    if (rows.length == 0) {
+      res.status(200).json({
+        success: true,
+        message: "검색 조건에 해당하는 영화가 없습니다",
+      });
+      return;
+    }
+
     res.status(200).json({ success: true, items: rows, cnt: rows.length });
   } catch (e) {
     res.status(500).json({ success: false, error: e });
   }
 };
 
-// @desc    연도 정렬해서 가져오기
-// @url     GET /api/v1/movies/year
-// @request offset, limit, order : asc / desc (디폴트 오름차순), keyword
-//          (&offset=0&limit=25&order=0&keyword=war)
-// @response success, error, items : [{ id, title, genre, attendance, year }, cnt]
+// @desc    연도 정렬 조회 api
+// @route   GET /api/v1/movies/year
+// @req     필수 - offset, limit 선택 - order : asc / desc(디폴트 내림차순), keyword(디폴트 "")
+// @res     success, items : [{id, title, genre, attendance, year, cnt_comments, avg_rating}, cnt]
 exports.getMoviesByYear = async (req, res, next) => {
-  let offset = req.query.offset;
-  let limit = req.query.limit;
-  let order = req.query.order;
-  let keyword = req.query.keyword;
+  console.log(chalk.bold("<<  연도 정렬 조회 api 실행됨  >>"));
 
-  if (!offset || !limit) {
-    res.status(400).json({ message: "파라미터 셋팅 에러" });
-    return;
-  }
-
-  if (!order || order == 0) {
-    order = "asc";
-  } else if (order == 1) {
-    order = "desc";
-  }
-
-  if (!keyword) {
-    keyword = "";
-  }
-
-  let query = `select * from movie where title like '%${keyword}%' order by year ${order} limit ${offset}, ${limit}`;
-  console.log(query);
-
-  try {
-    [rows] = await connection.query(query);
-    res.status(200).json({ success: true, items: rows, cnt: rows.length });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e });
-  }
-};
-
-// @desc    관객수 정렬해서 가져오기
-// @url     GET /api/v1/movies/attnd
-// @request offset, limit, order : asc / desc (디폴트 오름차순), keyword
-//          (&offset=0&limit=25&order=0&keyword=war)
-// @response success, error, items : [{ id, title, genre, attendance, year }, cnt]
-exports.getMoviesByAttnd = async (req, res, next) => {
   let offset = req.query.offset;
   let limit = req.query.limit;
   let order = req.query.order;
@@ -116,145 +108,82 @@ exports.getMoviesByAttnd = async (req, res, next) => {
     keyword = "";
   }
 
-  query = `select * from movie where title like '%${keyword}%' order by attendance ${order} limit ${offset}, ${limit}`;
-  console.log(query);
+  let query = `select m.*, count(r.comments) as cnt_comments, 
+  ifnull(round(avg(r.rating), 2), "unrated") as avg_rating 
+  from movie as m 
+  left join movie_reply as r 
+  on m.id = r.movie_id 
+  where m.title like "%${keyword}%" 
+  group by m.id 
+  order by m.year ${order} 
+  limit ${offset}, ${limit}`;
 
   try {
     [rows] = await connection.query(query);
+
+    if (rows.length == 0) {
+      res.status(200).json({
+        success: true,
+        message: "검색 조건에 해당하는 영화가 없습니다",
+      });
+      return;
+    }
+
     res.status(200).json({ success: true, items: rows, cnt: rows.length });
   } catch (e) {
     res.status(500).json({ success: false, error: e });
   }
 };
 
-// @desc    즐겨찾기 설정 with auth
-// @route   POST /api/v1/movies/set_fav?movie_id=1
-// @req     movie_id
-exports.saveFavorite = async (req, res, next) => {
-  console.log(
-    chalk.bold(
-      "--------------------<  즐겨찾기 설정 api 실행됨  >--------------------"
-    )
-  );
-  let user_id = req.user.user_id;
-  let movie_id = req.query.movie_id;
+// @desc    관객수 정렬 조회 api
+// @route   GET /api/v1/movies/attnd
+// @req     필수 - offset, limit 선택 - order : asc / desc(디폴트 내림차순), keyword(디폴트 "")
+// @res     success, items : [{id, title, genre, attendance, year, cnt_comments, avg_rating}, cnt]
+exports.getMoviesByAttnd = async (req, res, next) => {
+  console.log(chalk.bold("<<  관객수 정렬 조회 api 실행됨  >>"));
 
-  if (!user_id) {
-    res.status(400).json({ success: false, message: "잘못된 접근" });
-    return;
-  }
-
-  let query = `select * from movie where id = ${movie_id}`;
-
-  try {
-    [rows] = await connection.query(query);
-
-    if (rows.length == 0) {
-      res.status(200).json({
-        success: false,
-        message: "해당되는 id의 영화가 존재하지 않습니다",
-      });
-      return;
-    }
-
-    query = `insert into favorite_movie (user_id, movie_id) values ?`;
-    values = [user_id, movie_id];
-
-    try {
-      [result] = await connection.query(query, [[values]]);
-
-      res.status(200).json({
-        success: true,
-        message: "선택한 영화가 즐겨챶기에 추가되었습니다",
-      });
-    } catch (e) {
-      if (e.errno == 1062) {
-        // 1062 : 중복 에러
-        res.status(400).json({
-          success: false,
-          errno: 1,
-          message: `즐겨찾기에 이미 저장된 영화입니다`,
-        });
-        return;
-      }
-
-      res.status(500).json({ success: false, error: e });
-    }
-  } catch (e) {
-    res.status(500).json({ success: false, error: e });
-  }
-};
-
-// @desc    즐겨찾기 가져오기 with auth
-// @route   GET /api/v1/movies/get_fav?offset=0&limit=25
-// @req     offset, limit
-exports.viewFavorite = async (req, res, next) => {
-  console.log(
-    chalk.bold(
-      "--------------------<  즐겨찾기 가져오기 api 실행됨  >--------------------"
-    )
-  );
-  let user_id = req.user.user_id;
   let offset = req.query.offset;
   let limit = req.query.limit;
+  let order = req.query.order;
+  let keyword = req.query.keyword;
 
-  if (!user_id) {
-    res.status(400).json({ success: false, message: "잘못된 접근" });
+  if (!offset || !limit) {
+    res.status(400).json({ message: "파라미터 셋팅 에러" });
     return;
   }
 
-  query = `select m.* from favorite_movie as f join movie as m on f.movie_id = m.id 
-           where f.user_id = ${user_id} limit ${offset}, ${limit}`;
+  if (!order || order == 1) {
+    order = "desc";
+  } else if (order == 0) {
+    order = "asc";
+  }
+
+  if (!keyword) {
+    keyword = "";
+  }
+
+  query = `select m.*, count(r.comments) as cnt_comments, 
+  ifnull(round(avg(r.rating), 2), "unrated") as avg_rating 
+  from movie as m 
+  left join movie_reply as r 
+  on m.id = r.movie_id 
+  where m.title like "%${keyword}%" 
+  group by m.id 
+  order by m.attendance ${order} 
+  limit ${offset}, ${limit}`;
 
   try {
     [rows] = await connection.query(query);
 
     if (rows.length == 0) {
-      res
-        .status(200)
-        .json({ success: true, message: "즐겨찾기한 영화가 없습니다" });
-      return;
-    }
-
-    res.status(200).json({ success: true, items: rows });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e });
-  }
-};
-
-// @desc    즐겨찾기 삭제 with auth
-// @route   DELETE /api/v1/movies/delete_fav&movie_id=1
-// @req     movie_id
-exports.deleteFavorite = async (req, res, next) => {
-  console.log(
-    chalk.bold(
-      "--------------------<  즐겨찾기 삭제 api 실행됨  >--------------------"
-    )
-  );
-  let user_id = req.user.user_id;
-  let movie_id = req.query.movie_id;
-
-  if (!user_id) {
-    res.status(400).json({ success: false, message: "잘못된 접근" });
-    return;
-  }
-
-  let query = `delete from favorite_movie where user_id = ${user_id} and movie_id = ${movie_id}`;
-
-  try {
-    [result] = await connection.query(query);
-
-    if (result.affectedRows == 0) {
       res.status(200).json({
-        success: false,
-        message: "id에 해당하는 영화가 존재하지 않습니다.",
+        success: true,
+        message: "검색 조건에 해당하는 영화가 없습니다",
       });
       return;
     }
 
-    res
-      .status(200)
-      .json({ success: true, message: "선택한 영화가 삭제되었습니다." });
+    res.status(200).json({ success: true, items: rows, cnt: rows.length });
   } catch (e) {
     res.status(500).json({ success: false, error: e });
   }
