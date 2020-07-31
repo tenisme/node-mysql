@@ -33,7 +33,7 @@ const auth = async (req, res, next) => {
   }
 
   // 빼온 user_id값으로 DB에서 유저 정보 select하기
-  let query = `select * from user_tokens where user_id = ${user_id}`;
+  let query = `select * from contact_tokens where user_id = ${user_id}`;
 
   try {
     [rows, fields] = await connection.query(query);
@@ -54,7 +54,7 @@ const auth = async (req, res, next) => {
 
   if (isCorrect) {
     // 유효한 토큰이 맞을 경우, "user" 정보를 db에서 가져온다.
-    let query = `select * from users where user_id = ${user_id}`;
+    let query = `select * from contact_users where user_id = ${user_id}`;
     try {
       [rows, fields] = await connection.query(query);
       // 유저 정보를 req에 셋팅해서 next()한다.

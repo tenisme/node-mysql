@@ -4,7 +4,6 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const chalk = require("chalk");
 const validator = require("validator");
-const path = require("path");
 
 // 파일 참조
 const connection = require("../db/mysql_connection.js");
@@ -34,7 +33,7 @@ exports.createUser = async (req, res, next) => {
   }
 
   // DB에 유저 정보 insert
-  let query = `insert into movie_user (login_id, email, passwd) values ?`;
+  let query = `insert into contact_users (login_id, email, passwd) values ?`;
   let values = [login_id, email, hashedPasswd];
 
   // 트랜잭션 셋팅
@@ -70,7 +69,7 @@ exports.createUser = async (req, res, next) => {
   // 토큰 만들기 / DB에 토큰 저장하기
   let token = jwt.sign({ user_id: user_id }, process.env.ACCESS_TOKEN_SECRET);
 
-  query = `insert into movie_token (token, user_id) values ('${token}',${user_id})`;
+  query = `insert into contact_tokens (token, user_id) values ('${token}',${user_id})`;
 
   try {
     [result] = await conn.query(query);
@@ -115,77 +114,6 @@ exports.createUser = async (req, res, next) => {
   await conn.release();
 };
 
-// @desc    프로필 사진 설정 api with auth
-// @route   PUT /api/v1/users/set_photo
-// @req     user_id(auth), photo
-// @res     success
-exports.setMyPhoto = async (req, res, next) => {
-  console.log(chalk.bold("<<  프로필 사진 설정 api 실행됨  >>"));
-
-  // 클라이언트가 사진을 보내고, 서버가 이 사진을 받는다.
-  // 1. 서버가 이 사진을 디렉토리에 저장하고 2. 이 사진의 파일명을 DB에 저장한다.
-
-  let user_id = req.user.user_id;
-
-  if (!user_id) {
-    res.status(401).json({ success: false, message: "잘못된 접근" });
-    return;
-  }
-
-  if (!req.files) {
-    res.status(400).json({ success: false, message: "가져올 파일 없음" });
-    return;
-  }
-
-  console.log(req.files);
-
-  // postman > form_data > key 값에 적은 이름(파라미터). req에서 보낸 파일을 photo라는 키값으로 불러온다.
-  const photo = req.files.photo;
-
-  // 지금 받은 파일이 이미지 파일인지 체크
-  // startsWith("image") < 이 값이 "image"로 시작하는지 확인
-  if (!photo.mimetype.startsWith("image")) {
-    res.status(400).json({ success: false, message: "이미지 파일이 아님" });
-    return;
-  }
-
-  if (photo.size > process.env.MAX_FILE_SIZE) {
-    res.status(400).json({ success: false, message: "업로드 파일 용량 초과" });
-    return;
-  }
-
-  // 파일명 변경
-  // path.parse(photo.name) photo의 name을 파싱하는 함수 => path.parse(). 거기의 확장자 부분만 사용하겠다 => .ext
-  photo.name = `photo_${user_id}${path.parse(photo.name).ext}`;
-
-  // 이름을 변경한 파일을 저장할 경로를 지정
-  let fileUploadPath = `${process.env.FILE_UPLOAD_PATH}/${photo.name}`;
-
-  // 파일을 지정한 경로에 저장
-  photo.mv(fileUploadPath, async (err) => {
-    if (err) {
-      res.status(500).json({ error: err });
-      return;
-    }
-  });
-  // mv() : 파일을 지정한 경로에 저장하는 함수. move
-  // async (err) => {} : 콜백함수
-  // 여기까지 하면 파일(이미지)를 서버에 올리게 되는 것.
-
-  // DB의 photo_url 컬럼에 파일명 저장
-  let query = `update users set photo_url = "${photo.name}" where user_id = ${user_id}`;
-
-  try {
-    [result] = await connection.query(query);
-
-    res
-      .status(200)
-      .json({ success: true, message: "프로필 이미지가 설정되었습니다" });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e });
-  }
-};
-
 // @desc    로그인 api
 // @route   POST /api/v1/users/login
 // @req     login_id, passwd
@@ -196,7 +124,7 @@ exports.login = async (req, res, next) => {
   let login_id = req.body.login_id;
   let passwd = req.body.passwd;
 
-  let query = `select * from users where login_id = '${login_id}'`;
+  let query = `select * from contact_users where login_id = '${login_id}'`;
 
   try {
     [rows] = await connection.query(query);
@@ -227,7 +155,7 @@ exports.login = async (req, res, next) => {
     let token = jwt.sign({ user_id: user_id }, process.env.ACCESS_TOKEN_SECRET);
 
     // DB에 로그인시 생성한 토큰을 저장
-    query = `insert into user_tokens (token, user_id) values ?`;
+    query = `insert into contact_tokens (token, user_id) values ?`;
     values = [token, user_id];
 
     try {
@@ -270,7 +198,7 @@ exports.viewMyInfo = async (req, res, next) => {
     return;
   }
 
-  let query = `select * from movie_user where user_id = ${user_id}`;
+  let query = `select * from contact_users where user_id = ${user_id}`;
 
   try {
     [rows] = await connection.query(query);
@@ -303,7 +231,7 @@ exports.logout = async (req, res, next) => {
     return;
   }
 
-  let query = `delete from movie_token where user_id = ${user_id} and token = "${token}"`;
+  let query = `delete from contact_tokens where user_id = ${user_id} and token = "${token}"`;
 
   try {
     [result] = await connection.query(query);
@@ -333,7 +261,7 @@ exports.logoutAll = async (req, res, next) => {
     return;
   }
 
-  let query = `delete from movie_token where user_id = ${user_id}`;
+  let query = `delete from contact_tokens where user_id = ${user_id}`;
 
   try {
     [result] = await connection.query(query);
@@ -365,7 +293,7 @@ exports.deleteUser = async (req, res, next) => {
     return;
   }
 
-  let query = `delete from movie_user where user_id = ${user_id}`;
+  let query = `delete from contact_users where user_id = ${user_id}`;
 
   // 트랜잭션 셋팅
   const conn = await connection.getConnection();
@@ -377,12 +305,12 @@ exports.deleteUser = async (req, res, next) => {
     [result] = await conn.query(query);
 
     // 두번째 테이블에서 정보 삭제
-    query = `delete from movie_token where user_id = ${user_id}`;
+    query = `delete from contact_tokens where user_id = ${user_id}`;
     [result] = await conn.query(query);
 
-    // 세번째 테이블에서 정보 삭제
-    query = `delete from favorite_movie where user_id = ${user_id}`;
-    [result] = await conn.query(query);
+    // // 세번째 테이블에서 정보 삭제
+    // query = `delete from favorite_movie where user_id = ${user_id}`;
+    // [result] = await conn.query(query);
 
     await conn.commit();
 
@@ -412,7 +340,7 @@ exports.updatePasswd = async (req, res, next) => {
   }
 
   // 유저 찾기
-  let query = `select * from movie_user where user_id = "${user_id}"`;
+  let query = `select * from contact_users where user_id = "${user_id}"`;
 
   try {
     [rows] = await connection.query(query);
@@ -442,7 +370,7 @@ exports.updatePasswd = async (req, res, next) => {
     // 새 비밀번호 암호화 및 기존 비밀번호 정보 업데이트
     const hashedPasswd = await bcrypt.hash(new_passwd, 8);
 
-    query = `update movie_user set passwd = "${hashedPasswd}" where user_id = ${user_id}`;
+    query = `update contact_users set passwd = "${hashedPasswd}" where user_id = ${user_id}`;
 
     try {
       [result] = await connection.query(query);
@@ -474,7 +402,7 @@ exports.forgotPasswd = async (req, res, next) => {
   let login_id = req.body.login_id;
   let email = req.body.email;
 
-  let query = `select * from movie_user where login_id = "${login_id}" and email = "${email}"`;
+  let query = `select * from contact_users where login_id = "${login_id}" and email = "${email}"`;
 
   try {
     [rows] = await connection.query(query);
@@ -495,7 +423,7 @@ exports.forgotPasswd = async (req, res, next) => {
       .digest("hex");
 
     // 리셋 토큰을 DB에 저장
-    query = `update movie_user set reset_passwd_token = "${resetPasswdToken}" where user_id = ${rows[0].user_id}`;
+    query = `update contact_users set reset_passwd_token = "${resetPasswdToken}" where user_id = ${rows[0].user_id}`;
 
     try {
       [result] = await connection.query(query);
@@ -539,7 +467,7 @@ exports.resetPasswd = async (req, res, next) => {
 
   const resetPasswdToken = req.params.resetPasswdToken;
 
-  let query = `select * from movie_user where reset_passwd_token = "${resetPasswdToken}"`;
+  let query = `select * from contact_users where reset_passwd_token = "${resetPasswdToken}"`;
   let user_id;
 
   try {
@@ -559,7 +487,7 @@ exports.resetPasswd = async (req, res, next) => {
   let new_passwd = req.body.new_passwd;
   const hashedPasswd = await bcrypt.hash(new_passwd, 8);
 
-  query = `update movie_user set passwd = "${hashedPasswd}", reset_passwd_token = "" where user_id = ${user_id}`;
+  query = `update contact_users set passwd = "${hashedPasswd}", reset_passwd_token = "" where user_id = ${user_id}`;
 
   try {
     [result] = await connection.query(query);

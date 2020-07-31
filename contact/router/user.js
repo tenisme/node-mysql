@@ -11,8 +11,7 @@ const {
   updatePasswd,
   forgotPasswd,
   resetPasswd,
-  setMyPhoto,
-} = require("../controllers/users.js");
+} = require("../controllers/user.js");
 
 const router = express.Router();
 
@@ -21,7 +20,6 @@ router
   .post(createUser)
   .get(auth, viewMyInfo)
   .delete(auth, deleteUser);
-router.route("/set_photo").put(auth, setMyPhoto);
 router.route("/login").post(login);
 router.route("/logout").post(auth, logout);
 router.route("/logout_all").post(auth, logoutAll);

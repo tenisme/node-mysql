@@ -1,13 +1,12 @@
 const connection = require("../db/mysql_connection.js");
-const ErrorResponse = require("../utils/errorResponse.js");
 
-// @desc    모든 주소록 가져오기
+// @desc    모든 주소록 가져오기 with auth
 // @route   GET /api/v1/contacts?offset=0&limit=5
 exports.getContacts = async (req, res, next) => {
   let offset = req.query.offset;
   let limit = req.query.limit;
 
-  let query = `select * from contact limit ${offset}, ${limit}`;
+  let query = `select * from contacts limit ${offset}, ${limit}`;
 
   try {
     [rows, fields] = await connection.query(query);
@@ -19,14 +18,14 @@ exports.getContacts = async (req, res, next) => {
   }
 };
 
-// @desc    주소록 1개 추가하기
+// @desc    주소록 1개 추가하기 with auth
 // @route   POST /api/v1/contacts
 // @parameters  name, phone
 exports.createContact = async (req, res, next) => {
   let name = req.body.name;
   let phone = req.body.phone;
 
-  let query = "insert into contact (name, phone) values ?";
+  let query = "insert into contacts (name, phone) values ?";
   let values = [name, phone];
 
   try {
@@ -43,7 +42,7 @@ exports.createContact = async (req, res, next) => {
   }
 };
 
-// @desc    주소록 1개 수정하기
+// @desc    주소록 1개 수정하기 with auth
 // @route   PUT /api/v1/contacts
 // @parameters  id, name, phone
 exports.updateContact = async (req, res, next) => {
@@ -51,7 +50,7 @@ exports.updateContact = async (req, res, next) => {
   let name = req.body.name;
   let phone = req.body.phone;
 
-  let query = "update contact set name = ?, phone = ? where id = ?";
+  let query = "update contacts set name = ?, phone = ? where id = ?";
   let values = [name, phone, id];
 
   try {
@@ -68,13 +67,13 @@ exports.updateContact = async (req, res, next) => {
   }
 };
 
-// @desc    주소록 1개 삭제하기
+// @desc    주소록 1개 삭제하기 with auth
 // @route   DELETE /api/v1/contacts
 // @parameters  id
 exports.deleteContact = async (req, res, next) => {
   let id = req.body.id;
 
-  let query = "delete from contact where id = ?";
+  let query = "delete from contacts where id = ?";
   let values = [id];
 
   try {
@@ -91,12 +90,12 @@ exports.deleteContact = async (req, res, next) => {
   }
 };
 
-// @desc    이름이나 폰번호로 검색하기
+// @desc    이름이나 폰번호로 검색하기 with auth
 // @route   GET /api/v1/contacts/search?keyword=
 exports.searchContact = async (req, res, next) => {
   let keyword = req.query.keyword;
 
-  let query = `select * from contact where name like "%${keyword}%" or phone like "%${keyword}%"`;
+  let query = `select * from contacts where name like "%${keyword}%" or phone like "%${keyword}%"`;
 
   try {
     [rows, fields] = await connection.query(query);

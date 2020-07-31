@@ -8,30 +8,29 @@ const chalk = require("chalk");
 exports.getMovies = async (req, res, next) => {
   console.log(chalk.bold("<<  영화 데이터 조회 api 실행됨  >>"));
 
-  console.log(req);
-  // let offset = req.query.offset;
-  // let limit = req.query.limit;
+  let offset = req.query.offset;
+  let limit = req.query.limit;
 
-  // if (!offset || !limit) {
-  //   res.status(400).json({ success: false, message: "파라미터 셋팅 에러" });
-  //   return;
-  // }
+  if (!offset || !limit) {
+    res.status(400).json({ success: false, message: "파라미터 셋팅 에러" });
+    return;
+  }
 
-  // let query = `select m.*, count(r.comments) as cnt_comments,
-  // ifnull(round(avg(r.rating), 2), "unrated") as avg_rating
-  // from movie as m
-  // left join movie_reply as r
-  // on m.id = r.movie_id
-  // group by m.id
-  // order by m.id
-  // limit ${offset}, ${limit}`;
+  let query = `select m.*, count(r.comments) as cnt_comments,
+  ifnull(round(avg(r.rating), 2), "unrated") as avg_rating
+  from movies as m
+  left join replies as r
+  on m.id = r.movie_id
+  group by m.id
+  order by m.id
+  limit ${offset}, ${limit}`;
 
-  // try {
-  //   [rows] = await connection.query(query);
-  //   res.status(200).json({ success: true, items: rows, cnt: rows.length });
-  // } catch (e) {
-  //   res.status(500).json({ success: false, error: e });
-  // }
+  try {
+    [rows] = await connection.query(query);
+    res.status(200).json({ success: true, items: rows, cnt: rows.length });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e });
+  }
 };
 
 // @desc    영화명으로 조회 api
