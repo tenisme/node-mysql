@@ -16,7 +16,6 @@ router
   .post(createContact)
   .put(updateContact)
   .delete(deleteContact);
-
 router.route("/search").get(searchContact);
 
 module.exports = router;

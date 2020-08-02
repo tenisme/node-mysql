@@ -33,10 +33,11 @@ const auth = async (req, res, next) => {
   }
 
   // 빼온 user_id값으로 DB에서 유저 정보 select하기
-  let query = `select * from contact_tokens where user_id = ${user_id}`;
+  let query = "select * from contact_tokens where user_id = ?";
+  let values = [user_id];
 
   try {
-    [rows, fields] = await connection.query(query);
+    [rows, fields] = await connection.query(query, values);
     // console.log(chalk.blueBright(JSON.stringify(rows)));
   } catch (e) {
     res.status(401).json({ error: "인증 먼저 하십시오" });
@@ -54,9 +55,11 @@ const auth = async (req, res, next) => {
 
   if (isCorrect) {
     // 유효한 토큰이 맞을 경우, "user" 정보를 db에서 가져온다.
-    let query = `select * from contact_users where user_id = ${user_id}`;
+    let query = "select * from contact_users where user_id = ?";
+    let values = [user_id];
+
     try {
-      [rows, fields] = await connection.query(query);
+      [rows, fields] = await connection.query(query, values);
       // 유저 정보를 req에 셋팅해서 next()한다.
       //   왜? 인증하면서, 유저 정보를 아예 가져와서 req에 저장하기 때문에
       //   API함수에서는 DB에서 유저 정보를 가져오는 코드를 작성할 필요가 없다.
