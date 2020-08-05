@@ -28,41 +28,24 @@ const auth = async (req, res, next) => {
     // console.log(decoded);
     user_id = decoded.user_id;
   } catch (e) {
-    res.status(401).json({ error: "형식에 맞지 않는 토큰(해커 ㅎㅇ)" });
+    res.status(401).json({ error: "형식에 맞지 않는 토큰" });
     return;
   }
 
   // 빼온 user_id값으로 DB에서 유저 정보 select하기
-  let query = "select * from contact_tokens where user_id = ?";
-  let values = [user_id];
+  let query =
+    "select u.user_id, u.email, u.created_at, t.token from contact_users as u \
+     join contact_tokens as t on u.user_id = t.user_id where u.user_id = ? and t.token = ?";
+  let values = [user_id, token];
 
   try {
     [rows, fields] = await connection.query(query, values);
-    // console.log(chalk.blueBright(JSON.stringify(rows)));
-  } catch (e) {
-    res.status(401).json({ error: "인증 먼저 하십시오" });
-    return;
-  }
 
-  // 가져온 토큰과 가져온 유저 아이디가 잘 맞는지를 반복문을 돌면서 체크한다.
-  let isCorrect = false;
-  for (let i = 0; i < rows.length; i++) {
-    if (rows[i].user_id == user_id && rows[i].token == token) {
-      isCorrect = true;
-      break; // for문을 빠져나온다.
-    }
-  }
-
-  if (isCorrect) {
-    // 유효한 토큰이 맞을 경우, "user" 정보를 db에서 가져온다.
-    let query = "select * from contact_users where user_id = ?";
-    let values = [user_id];
-
-    try {
-      [rows, fields] = await connection.query(query, values);
-      // 유저 정보를 req에 셋팅해서 next()한다.
-      //   왜? 인증하면서, 유저 정보를 아예 가져와서 req에 저장하기 때문에
-      //   API함수에서는 DB에서 유저 정보를 가져오는 코드를 작성할 필요가 없다.
+    if (rows.length == 0) {
+      res.status(401).json({ error: "인증 먼저 하십시오" });
+      return;
+    } else {
+      req.user = rows[0];
 
       console.log(
         highlight_txt.bold("User authorization") +
@@ -76,20 +59,11 @@ const auth = async (req, res, next) => {
           highlight_txt(rows[0].created_at)
       );
 
-      let user = rows[0];
-
-      // 패스워드 정보는 필요 없으므로 빼고
-      delete user.passwd;
-
-      // req에 user 영역을 만들어 rows[0](select한 유저 정보)를 저장한다.
-      req.user = user;
-      req.user.token = token;
       next();
-    } catch (e) {
-      res.status(500).json({ error: "DB 에러" });
     }
-  } else {
-    res.status(401).json({ error: "인증이 안 된 토큰입니다." });
+  } catch (e) {
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
+    return;
   }
 };
 

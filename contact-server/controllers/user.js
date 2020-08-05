@@ -22,22 +22,37 @@ exports.createUser = async (req, res, next) => {
   let email = req.body.email;
   let passwd = req.body.passwd;
 
-  // 패스워드 암호화
-  const hashedPasswd = await bcrypt.hash(passwd, 8);
-
-  // 이메일이 정상적인가 체크
-  if (!validator.isEmail(email)) {
-    res.status(500).json({
+  if (!login_id || !passwd || !email) {
+    res.status(400).json({
       success: false,
-      message: "정상적인 이메일 형식으로 입력해주세요",
+      message: "아이디, 이메일, 패스워드 입력은 필수입니다",
     });
     return;
   }
+
+  if (login_id)
+    if (!validator.isEmail(email)) {
+      // 이메일이 정상적인지 체크
+      res.status(400).json({
+        success: false,
+        message: "정상적인 이메일 형식으로 입력해주세요",
+      });
+      return;
+    } else if (email.length > 100) {
+      res.status(400).json({
+        success: false,
+        message: "이메일은 100자 이내로 입력해주세요",
+      });
+      return;
+    }
 
   // 트랜잭션 셋팅
   const conn = await connection.getConnection();
   // 트랜잭션 시작
   await conn.beginTransaction();
+
+  // 패스워드 암호화
+  const hashedPasswd = await bcrypt.hash(passwd, 8);
 
   // DB에 유저 정보 insert
   let query = "insert into contact_users (login_id, email, passwd) values ?";
@@ -132,6 +147,7 @@ exports.login = async (req, res, next) => {
 
   let query = "select * from contact_users where login_id = ?";
   let values = [login_id];
+  let user_id;
 
   try {
     [rows] = await connection.query(query, values);
@@ -156,37 +172,38 @@ exports.login = async (req, res, next) => {
       return;
     }
 
-    let user_id = rows[0].user_id;
+    user_id = rows[0].user_id;
+  } catch (e) {
+    res.status(500).json({ success: false, message: "DB ERROR", error: e });
+    return;
+  }
 
-    // 로그인 토큰 생성 (jwt)
-    let token = jwt.sign({ user_id: user_id }, process.env.ACCESS_TOKEN_SECRET);
+  // 로그인 토큰 생성 (jwt)
+  let token = jwt.sign({ user_id: user_id }, process.env.ACCESS_TOKEN_SECRET);
 
-    // DB에 로그인시 생성한 토큰을 저장
-    query = "insert into contact_tokens (token, user_id) values ?";
-    values = [token, user_id];
+  // DB에 로그인시 생성한 토큰을 저장
+  query = "insert into contact_tokens (token, user_id) values ?";
+  values = [token, user_id];
 
-    try {
-      [result] = await connection.query(query, [[values]]);
+  try {
+    [result] = await connection.query(query, [[values]]);
 
-      if (result.affectedRows == 0) {
-        res.status(500).json({ success: false, message: "로그인 실패" });
-        return;
-      }
-
-      res.status(200).json({
-        success: true,
-        result: isMatch,
-        token: token,
-        message: "환영합니다",
-      });
-
-      console.log(
-        chalk.yellowBright.bold("User login") +
-          chalk.cyanBright(` - user_id : ${user_id}, login_id : ${login_id}`)
-      );
-    } catch (e) {
-      res.status(500).json({ success: false, message: "DB ERROR", error: e });
+    if (result.affectedRows == 0) {
+      res.status(500).json({ success: false, message: "로그인 실패" });
+      return;
     }
+
+    res.status(200).json({
+      success: true,
+      result: isMatch,
+      token: token,
+      message: "환영합니다",
+    });
+
+    console.log(
+      chalk.yellowBright.bold("User login") +
+        chalk.cyanBright(` - user_id : ${user_id}, login_id : ${login_id}`)
+    );
   } catch (e) {
     res.status(500).json({ success: false, message: "DB ERROR", error: e });
   }
@@ -228,7 +245,7 @@ exports.viewMyInfo = async (req, res, next) => {
 
 // @desc    현재 기기 로그아웃 api (with auth)
 // @route   DELETE /api/v1/users/logout
-// @req     user_id(auth)
+// @req     token(header), user_id(auth)
 // @res     success, message, error
 exports.logout = async (req, res, next) => {
   console.log(chalk.bold("<<  현재 기기 로그아웃 api 실행됨  >>"));

@@ -1,10 +1,12 @@
-const connection = require("../db/mysql_connection.js");
 const chalk = require("chalk");
+const validator = require("validator");
+
+const connection = require("../db/mysql_connection.js");
 
 // @desc    영화 데이터 조회 api
 // @route   GET /api/v1/movies
 // @req     offset, limit
-// @res     success, items : [{id, title, genre, attendance, year, cnt_comments, avg_rating}, cnt]
+// @res     success, items : [{id, title, genre, attendance, year, cnt_comments, avg_rating}], cnt
 exports.getMovies = async (req, res, next) => {
   console.log(chalk.bold("<<  영화 데이터 조회 api 실행됨  >>"));
 
@@ -16,6 +18,27 @@ exports.getMovies = async (req, res, next) => {
     return;
   }
 
+  let offsetIsNum = validator.isNumeric(offset);
+  let limitIsNum = validator.isNumeric(limit);
+
+  if (!offsetIsNum || !limitIsNum) {
+    res.status(400).json({
+      success: false,
+      message: "offset 혹은 limit에는 숫자만 입력이 가능합니다",
+    });
+    return;
+  }
+
+  if (limit <= 0) {
+    res
+      .status(400)
+      .json({ success: false, message: "1 이상의 숫자를 입력해야 합니다" });
+    return;
+  }
+
+  offset = Number(offset);
+  limit = Number(limit);
+
   let query = `select m.*, count(r.comments) as cnt_comments,
   ifnull(round(avg(r.rating), 2), "unrated") as avg_rating
   from movies as m
@@ -23,13 +46,14 @@ exports.getMovies = async (req, res, next) => {
   on m.id = r.movie_id
   group by m.id
   order by m.id
-  limit ${offset}, ${limit}`;
+  limit ?, ?`;
+  let values = [offset, limit];
 
   try {
-    [rows] = await connection.query(query);
+    [rows] = await connection.query(query, values);
     res.status(200).json({ success: true, items: rows, cnt: rows.length });
   } catch (e) {
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
   }
 };
 
@@ -49,6 +73,27 @@ exports.searchMovies = async (req, res, next) => {
     return;
   }
 
+  let offsetIsNum = validator.isNumeric(offset);
+  let limitIsNum = validator.isNumeric(limit);
+
+  if (!offsetIsNum || !limitIsNum) {
+    res.status(400).json({
+      success: false,
+      message: "offset 혹은 limit에는 숫자만 입력이 가능합니다",
+    });
+    return;
+  }
+
+  if (limit <= 0) {
+    res
+      .status(400)
+      .json({ success: false, message: "1 이상의 숫자를 입력해야 합니다" });
+    return;
+  }
+
+  offset = Number(offset);
+  limit = Number(limit);
+
   if (!keyword || keyword == "") {
     res.status(400).json({ message: "검색어를 입력해주세요" });
     return;
@@ -59,13 +104,14 @@ exports.searchMovies = async (req, res, next) => {
   from movie as m 
   left join movie_reply as r 
   on m.id = r.movie_id 
-  where m.title like "%${keyword}%" 
+  where m.title like "%?%" 
   group by m.id 
   order by m.id 
-  limit ${offset}, ${limit}`;
+  limit ?, ?`;
+  let values = [keyword, offset, limit];
 
   try {
-    [rows] = await connection.query(query);
+    [rows] = await connection.query(query, values);
 
     if (rows.length == 0) {
       res.status(200).json({
@@ -98,6 +144,25 @@ exports.getMoviesByYear = async (req, res, next) => {
     return;
   }
 
+  let offsetIsNum = validator.isNumeric(offset);
+  let limitIsNum = validator.isNumeric(limit);
+  let orderIsNum = validator.isNumeric(order);
+
+  if (!offsetIsNum || !limitIsNum || !orderIsNum) {
+    res.status(400).json({
+      success: false,
+      message: "offset, limit, order에는 숫자만 입력이 가능합니다",
+    });
+    return;
+  }
+
+  if (limit <= 0) {
+    res
+      .status(400)
+      .json({ success: false, message: "1 이상의 숫자를 입력해야 합니다" });
+    return;
+  }
+
   if (!order || order == 1) {
     order = "desc";
   } else if (order == 0) {
@@ -108,18 +173,23 @@ exports.getMoviesByYear = async (req, res, next) => {
     keyword = "";
   }
 
+  offset = Number(offset);
+  limit = Number(limit);
+  order = Number(order);
+
   let query = `select m.*, count(r.comments) as cnt_comments, 
   ifnull(round(avg(r.rating), 2), "unrated") as avg_rating 
   from movie as m 
   left join movie_reply as r 
   on m.id = r.movie_id 
-  where m.title like "%${keyword}%" 
+  where m.title like "%?%" 
   group by m.id 
-  order by m.year ${order} 
-  limit ${offset}, ${limit}`;
+  order by m.year ? 
+  limit ?, ?`;
+  let values = [keyword, order, offset, limit];
 
   try {
-    [rows] = await connection.query(query);
+    [rows] = await connection.query(query, values);
 
     if (rows.length == 0) {
       res.status(200).json({
@@ -131,7 +201,7 @@ exports.getMoviesByYear = async (req, res, next) => {
 
     res.status(200).json({ success: true, items: rows, cnt: rows.length });
   } catch (e) {
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
   }
 };
 
@@ -152,6 +222,25 @@ exports.getMoviesByAttnd = async (req, res, next) => {
     return;
   }
 
+  let offsetIsNum = validator.isNumeric(offset);
+  let limitIsNum = validator.isNumeric(limit);
+  let orderIsNum = validator.isNumeric(order);
+
+  if (!offsetIsNum || !limitIsNum || !orderIsNum) {
+    res.status(400).json({
+      success: false,
+      message: "offset, limit, order에는 숫자만 입력이 가능합니다",
+    });
+    return;
+  }
+
+  if (limit <= 0) {
+    res
+      .status(400)
+      .json({ success: false, message: "1 이상의 숫자를 입력해야 합니다" });
+    return;
+  }
+
   if (!order || order == 1) {
     order = "desc";
   } else if (order == 0) {
@@ -162,18 +251,23 @@ exports.getMoviesByAttnd = async (req, res, next) => {
     keyword = "";
   }
 
-  query = `select m.*, count(r.comments) as cnt_comments, 
+  offset = Number(offset);
+  limit = Number(limit);
+  order = Number(order);
+
+  let query = `select m.*, count(r.comments) as cnt_comments, 
   ifnull(round(avg(r.rating), 2), "unrated") as avg_rating 
   from movie as m 
   left join movie_reply as r 
   on m.id = r.movie_id 
-  where m.title like "%${keyword}%" 
+  where m.title like "%?%" 
   group by m.id 
-  order by m.attendance ${order} 
-  limit ${offset}, ${limit}`;
+  order by m.attendance ? 
+  limit ?, ?`;
+  let values = [keyword, order, offset, limit];
 
   try {
-    [rows] = await connection.query(query);
+    [rows] = await connection.query(query, values);
 
     if (rows.length == 0) {
       res.status(200).json({
@@ -185,6 +279,6 @@ exports.getMoviesByAttnd = async (req, res, next) => {
 
     res.status(200).json({ success: true, items: rows, cnt: rows.length });
   } catch (e) {
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
   }
 };

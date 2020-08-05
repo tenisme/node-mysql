@@ -13,6 +13,7 @@ const sendEmail = require("../utils/sendemail.js");
 // @desc    회원 가입 api
 // @route   POST /api/v1/users
 // @req     login_id, email, passwd
+// @res     success, message, error
 exports.createUser = async (req, res, next) => {
   console.log(chalk.bold("<<  회원 가입 api 실행됨  >>"));
 
@@ -33,14 +34,14 @@ exports.createUser = async (req, res, next) => {
     return;
   }
 
-  // DB에 유저 정보 insert
-  let query = `insert into movie_user (login_id, email, passwd) values ?`;
-  let values = [login_id, email, hashedPasswd];
-
   // 트랜잭션 셋팅
   const conn = await connection.getConnection();
   // 트랜잭션 시작
   await conn.beginTransaction();
+
+  // DB에 유저 정보 insert
+  let query = "insert into users (login_id, email, passwd) values ?";
+  let values = [login_id, email, hashedPasswd];
 
   try {
     [result] = await conn.query(query, [[values]]);
@@ -63,17 +64,18 @@ exports.createUser = async (req, res, next) => {
       return;
     }
 
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: "DB ERROR", error: e });
     return;
   }
 
   // 토큰 만들기 / DB에 토큰 저장하기
   let token = jwt.sign({ user_id: user_id }, process.env.ACCESS_TOKEN_SECRET);
 
-  query = `insert into movie_token (token, user_id) values ('${token}',${user_id})`;
+  query = "insert into user_tokens (token, user_id) values ?";
+  values = [token, user_id];
 
   try {
-    [result] = await conn.query(query);
+    [result] = await conn.query(query, values);
 
     if (result.affectedRows == 0) {
       await conn.rollback();
@@ -91,7 +93,9 @@ exports.createUser = async (req, res, next) => {
       });
     } catch (e) {
       await conn.rollback();
-      res.status(500).json({ success: false, error: e });
+      res
+        .status(500)
+        .json({ success: false, message: "EMAIL ERROR", error: e });
       return;
     }
 
@@ -108,7 +112,7 @@ exports.createUser = async (req, res, next) => {
     );
   } catch (e) {
     await conn.rollback();
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: "DB ERROR", error: e });
   }
 
   // 트랜잭션 - (DB) 커넥션 반환
@@ -118,7 +122,7 @@ exports.createUser = async (req, res, next) => {
 // @desc    프로필 사진 설정 api with auth
 // @route   PUT /api/v1/users/set_photo
 // @req     user_id(auth), photo
-// @res     success
+// @res     success, message, error
 exports.setMyPhoto = async (req, res, next) => {
   console.log(chalk.bold("<<  프로필 사진 설정 api 실행됨  >>"));
 
@@ -132,12 +136,13 @@ exports.setMyPhoto = async (req, res, next) => {
     return;
   }
 
+  // 이미지 파일을 보내지 않았을 때 처리
   if (!req.files) {
     res.status(400).json({ success: false, message: "가져올 파일 없음" });
     return;
   }
 
-  console.log(req.files);
+  // console.log(req.files);
 
   // postman > form_data > key 값에 적은 이름(파라미터). req에서 보낸 파일을 photo라는 키값으로 불러온다.
   const photo = req.files.photo;
@@ -173,22 +178,24 @@ exports.setMyPhoto = async (req, res, next) => {
   // 여기까지 하면 파일(이미지)를 서버에 올리게 되는 것.
 
   // DB의 photo_url 컬럼에 파일명 저장
-  let query = `update users set photo_url = "${photo.name}" where user_id = ${user_id}`;
+  let query = `update users set photo_url = ? where user_id = ?`;
+  let values = [photo.name, user_id];
 
   try {
-    [result] = await connection.query(query);
+    [result] = await connection.query(query, values);
 
     res
       .status(200)
       .json({ success: true, message: "프로필 이미지가 설정되었습니다" });
   } catch (e) {
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
   }
 };
 
 // @desc    로그인 api
 // @route   POST /api/v1/users/login
 // @req     login_id, passwd
+// @res     success, message, error
 exports.login = async (req, res, next) => {
   console.log(chalk.bold("<<  로그인 api 실행됨  >>"));
 
@@ -196,10 +203,11 @@ exports.login = async (req, res, next) => {
   let login_id = req.body.login_id;
   let passwd = req.body.passwd;
 
-  let query = `select * from users where login_id = '${login_id}'`;
+  let query = `select * from users where login_id = ?`;
+  let values = [login_id];
 
   try {
-    [rows] = await connection.query(query);
+    [rows] = await connection.query(query, values);
 
     // 등록된 아이디인지 체크
     if (rows.length == 0) {
@@ -259,7 +267,8 @@ exports.login = async (req, res, next) => {
 
 // @desc    내 정보 조회 api (with auth)
 // @route   GET /api/v1/users
-// @res     { login_id, email, created_at }
+// @req     user_id(auth)
+// @res     { user_id, login_id, email, created_at }
 exports.viewMyInfo = async (req, res, next) => {
   console.log(chalk.bold("<<  내 정보 조회 api 실행됨  >>"));
 
@@ -270,23 +279,23 @@ exports.viewMyInfo = async (req, res, next) => {
     return;
   }
 
-  let query = `select * from movie_user where user_id = ${user_id}`;
+  let query = `select * from users where user_id = ?`;
+  let values = [user_id];
 
   try {
-    [rows] = await connection.query(query);
+    [rows] = await connection.query(query, values);
 
     if (rows.length == 0) {
       res.status(500).json({ success: false, message: "정보 조회 실패" });
       return;
     }
 
-    delete rows[0].user_id;
     delete rows[0].passwd;
     delete rows[0].reset_passwd_token;
 
     res.status(200).json({ success: true, message: rows });
   } catch (e) {
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
   }
 };
 
@@ -303,10 +312,11 @@ exports.logout = async (req, res, next) => {
     return;
   }
 
-  let query = `delete from movie_token where user_id = ${user_id} and token = "${token}"`;
+  let query = `delete from user_tokens where user_id = ? and token = ?`;
+  let values = [user_id, token];
 
   try {
-    [result] = await connection.query(query);
+    [result] = await connection.query(query, values);
 
     if (result.affectedRows == 0) {
       res.status(500).json({ success: false, message: "로그아웃 실패" });
@@ -317,7 +327,7 @@ exports.logout = async (req, res, next) => {
       .status(200)
       .json({ success: true, message: "성공적으로 로그아웃되었습니다." });
   } catch (e) {
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
   }
 };
 
@@ -333,10 +343,11 @@ exports.logoutAll = async (req, res, next) => {
     return;
   }
 
-  let query = `delete from movie_token where user_id = ${user_id}`;
+  let query = `delete from user_tokens where user_id = ?`;
+  let values = [user_id];
 
   try {
-    [result] = await connection.query(query);
+    [result] = await connection.query(query, values);
 
     if (result.affectedRows == 0) {
       res.status(500).json({ success: false, message: "로그아웃 실패" });
@@ -348,10 +359,11 @@ exports.logoutAll = async (req, res, next) => {
       message: "모든 기기에서 성공적으로 로그아웃되었습니다.",
     });
   } catch (e) {
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
   }
 };
 
+// ★ 여기 나중에 신경써서 수정하기
 // @desc    회원 탈퇴 api (with auth)
 // @route   DELETE /api/v1/users
 exports.deleteUser = async (req, res, next) => {
@@ -365,7 +377,8 @@ exports.deleteUser = async (req, res, next) => {
     return;
   }
 
-  let query = `delete from movie_user where user_id = ${user_id}`;
+  let query = `delete from users where user_id = ?`;
+  let values = [user_id];
 
   // 트랜잭션 셋팅
   const conn = await connection.getConnection();
@@ -374,15 +387,19 @@ exports.deleteUser = async (req, res, next) => {
 
   try {
     // 첫번째 테이블에서 정보 삭제
-    [result] = await conn.query(query);
+    [result] = await conn.query(query, values);
 
     // 두번째 테이블에서 정보 삭제
-    query = `delete from movie_token where user_id = ${user_id}`;
-    [result] = await conn.query(query);
+    query = `delete from user_tokens where user_id = ?`;
+    values = [user_id];
+
+    [result] = await conn.query(query, values);
 
     // 세번째 테이블에서 정보 삭제
-    query = `delete from favorite_movie where user_id = ${user_id}`;
-    [result] = await conn.query(query);
+    query = `delete from favorites where user_id = ?`;
+    values = [user_id];
+
+    [result] = await conn.query(query, values);
 
     await conn.commit();
 
@@ -391,7 +408,7 @@ exports.deleteUser = async (req, res, next) => {
       .json({ success: true, message: "정상적으로 탈퇴 처리 되었습니다." });
   } catch (e) {
     await conn.rollback();
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
   } finally {
     await conn.release();
   }
@@ -399,12 +416,14 @@ exports.deleteUser = async (req, res, next) => {
 
 // @desc    패스워드 변경 api : 기존 암호를 아는 경우 (with auth)
 // @route   PUT /api/v1/users/updatepasswd
-// @req     passwd, new_passwd
+// @req     user_id(auth), passwd, new_passwd
+// @res     success, message, error
 exports.updatePasswd = async (req, res, next) => {
   console.log(chalk.bold("<<  패스워드 변경 api 실행됨  >>"));
 
   let user_id = req.user.user_id;
   let passwd = req.body.passwd;
+  let new_passwd = req.body.new_passwd;
 
   if (!user_id) {
     res.status(400).json({ success: false, message: "잘못된 접근" });
@@ -412,10 +431,11 @@ exports.updatePasswd = async (req, res, next) => {
   }
 
   // 유저 찾기
-  let query = `select * from movie_user where user_id = "${user_id}"`;
+  let query = `select * from users where user_id = ?`;
+  let values = [user_id];
 
   try {
-    [rows] = await connection.query(query);
+    [rows] = await connection.query(query, values);
 
     // 기존 암호 일치 여부 확인
     let isMatch = await bcrypt.compare(passwd, rows[0].passwd);
@@ -429,8 +449,6 @@ exports.updatePasswd = async (req, res, next) => {
     }
 
     // 새 비밀번호와 기존 비밀번호의 일치 여부 확인
-    let new_passwd = req.body.new_passwd;
-
     if (passwd == new_passwd) {
       res.status(400).json({
         success: false,
@@ -438,46 +456,50 @@ exports.updatePasswd = async (req, res, next) => {
       });
       return;
     }
-
-    // 새 비밀번호 암호화 및 기존 비밀번호 정보 업데이트
-    const hashedPasswd = await bcrypt.hash(new_passwd, 8);
-
-    query = `update movie_user set passwd = "${hashedPasswd}" where user_id = ${user_id}`;
-
-    try {
-      [result] = await connection.query(query);
-
-      if (result.affectedRows == 0) {
-        res
-          .status(500)
-          .json({ success: false, message: "비밀번호 변경이 실패했습니다" });
-      }
-
-      res.status(200).json({
-        success: true,
-        message: "비밀번호가 성공적으로 변경되었습니다",
-      });
-    } catch (e) {
-      res.status(500).json({ success: false, error: e });
-    }
   } catch (e) {
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
+    return;
+  }
+
+  // 새 비밀번호 암호화 및 기존 비밀번호 정보 업데이트
+  const hashedPasswd = await bcrypt.hash(new_passwd, 8);
+
+  query = `update users set passwd = ? where user_id = ?`;
+  values = [hashedPasswd, user_id];
+
+  try {
+    [result] = await connection.query(query, values);
+
+    if (result.affectedRows == 0) {
+      res
+        .status(500)
+        .json({ success: false, message: "비밀번호 변경이 실패했습니다" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "비밀번호가 성공적으로 변경되었습니다",
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
   }
 };
 
 // @desc    패스워드 분실 / 리셋 요청 api
 // @route   POST /api/v1/users/forgotpasswd
 // @req     login_id, email
+// @res     success, message, error
 exports.forgotPasswd = async (req, res, next) => {
   console.log(chalk.bold("<<  패스워드 분실/요청 api 실행됨  >>"));
 
   let login_id = req.body.login_id;
   let email = req.body.email;
 
-  let query = `select * from movie_user where login_id = "${login_id}" and email = "${email}"`;
+  let query = `select * from users where login_id = ? and email = ?`;
+  let values = [login_id, email];
 
   try {
-    [rows] = await connection.query(query);
+    [rows] = await connection.query(query, values);
 
     // 기존 유저가 맞는지 체크하기
     if (rows.length == 0) {
@@ -486,64 +508,70 @@ exports.forgotPasswd = async (req, res, next) => {
         .json({ success: false, message: "존재하지 않는 id 혹은 email" });
       return;
     }
+  } catch (e) {
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
+    return;
+  }
 
-    // 리셋 토큰 설정
-    const resetToken = crypto.randomBytes(20).toString("hex");
-    const resetPasswdToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
+  // 리셋 토큰 설정
+  const resetToken = crypto.randomBytes(20).toString("hex");
+  const resetPasswdToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
 
-    // 리셋 토큰을 DB에 저장
-    query = `update movie_user set reset_passwd_token = "${resetPasswdToken}" where user_id = ${rows[0].user_id}`;
+  // 리셋 토큰을 DB에 저장
+  query = `update users set reset_passwd_token = ? where user_id = ?`;
+  values = [resetPasswdToken, rows[0].user_id];
 
+  try {
+    [result] = await connection.query(query, values);
+
+    if (result.affectedRows == 0) {
+      res.status(500).json({ success: false, message: "로그인 실패" });
+      return;
+    }
+
+    // 비밀번호 변경 이메일 보내기
+    const message = `다음의 링크 : localhost:5100/api/v1/users/resetpasswd/${resetPasswdToken} 에서 비밀번호를 변경하세요`;
     try {
-      [result] = await connection.query(query);
-
-      if (result.affectedRows == 0) {
-        res.status(500).json({ success: false, message: "로그인 실패" });
-        return;
-      }
-
-      // 비밀번호 변경 이메일 보내기
-      const message = `다음의 링크 : localhost:5100/api/v1/users/resetpasswd/${resetPasswdToken} 에서 비밀번호를 변경하세요`;
-      try {
-        await sendEmail({
-          email: email,
-          subject: "비밀번호 변경",
-          message: message,
-        });
-      } catch (e) {
-        res.status(500).json({ success: false, error: e });
-        return;
-      }
-
-      res.status(200).json({
-        success: true,
-        message: `'${email}'을 확인하여 비밀번호를 변경해주세요.`,
+      await sendEmail({
+        email: email,
+        subject: "비밀번호 변경",
+        message: message,
       });
     } catch (e) {
-      await conn.rollback();
-      res.status(500).json({ success: false, error: e });
+      res
+        .status(500)
+        .json({ success: false, message: `EMAIL ERROR`, error: e });
+      return;
     }
+
+    res.status(200).json({
+      success: true,
+      message: `'${email}'을 확인하여 비밀번호를 변경해주세요.`,
+    });
   } catch (e) {
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
   }
 };
 
 // @desc    패스워드 초기화 api
 // @route   POST /api/v1/users/resetpasswd/:resetPasswdToken
 // @req     resetPasswdToken, new_passwd
+// @res     success, message, error
 exports.resetPasswd = async (req, res, next) => {
   console.log(chalk.bold("<<  패스워드 초기화 api 실행됨  >>"));
 
   const resetPasswdToken = req.params.resetPasswdToken;
+  let new_passwd = req.body.new_passwd;
 
-  let query = `select * from movie_user where reset_passwd_token = "${resetPasswdToken}"`;
+  let query = `select * from movie_user where reset_passwd_token = ?`;
+  let values = [resetPasswdToken];
   let user_id;
 
   try {
-    [rows] = await connection.query(query);
+    [rows] = await connection.query(query, values);
 
     if (rows.length == 0) {
       res.status(400).json({ success: false, message: "잘못된 접근입니다" });
@@ -552,17 +580,17 @@ exports.resetPasswd = async (req, res, next) => {
 
     user_id = rows[0].user_id;
   } catch (e) {
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
     return;
   }
 
-  let new_passwd = req.body.new_passwd;
   const hashedPasswd = await bcrypt.hash(new_passwd, 8);
 
-  query = `update movie_user set passwd = "${hashedPasswd}", reset_passwd_token = "" where user_id = ${user_id}`;
+  query = `update movie_user set passwd = ?, reset_passwd_token = "" where user_id = ?`;
+  values = [hashedPasswd, user_id];
 
   try {
-    [result] = await connection.query(query);
+    [result] = await connection.query(query, values);
 
     if (result.affectedRows == 0) {
       res.status(500).json({ success: false, message: "로그인 실패" });
@@ -573,6 +601,6 @@ exports.resetPasswd = async (req, res, next) => {
       .status(200)
       .json({ success: true, message: "비밀번호가 성공적으로 변경되었습니다" });
   } catch (e) {
-    res.status(500).json({ success: false, error: e });
+    res.status(500).json({ success: false, message: `DB ERROR`, error: e });
   }
 };

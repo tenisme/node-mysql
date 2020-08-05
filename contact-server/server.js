@@ -1,6 +1,7 @@
 // npm 패키지 require
 const express = require("express");
 const dotenv = require("dotenv");
+dotenv.config({ path: "./config/config.env" });
 const morgan = require("morgan");
 
 // 라우터 require
@@ -9,7 +10,6 @@ const users = require("./router/user.js");
 const share = require("./router/share_contact.js");
 
 // 기타 파일 셋팅
-dotenv.config({ path: "./config/config.env" });
 const auth = require("./middleware/auth.js");
 
 const app = express();

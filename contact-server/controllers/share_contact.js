@@ -219,7 +219,7 @@ exports.saveSharedContact = async (req, res, next) => {
 
   let query =
     "select c.name, c.phone from contact_share as s join contacts as c on s.contact_id = c.contact_id \
-     where s.shared_user_id = ? and s.share_contact_token = '?'";
+     where s.shared_user_id = ? and s.share_contact_token = ?";
   let values = [shared_user_id, share_contact_token];
   let name;
   let phone;
@@ -358,12 +358,10 @@ exports.unShareContactsAll = async (req, res, next) => {
       return;
     }
 
-    res
-      .status(200)
-      .json({
-        success: false,
-        message: "모든 공유가 성공적으로 해제되었습니다",
-      });
+    res.status(200).json({
+      success: false,
+      message: "모든 공유가 성공적으로 해제되었습니다",
+    });
   } catch (e) {
     res.status(500).json({ success: false, message: "DB ERROR", error: e });
   }
